@@ -509,6 +509,8 @@
 		299522451BBF125A00859F49 /* AFNetworking */ = {
 			isa = PBXGroup;
 			children = (
+				299522511BBF125A00859F49 /* AFURLSessionManager.h */,
+				299522521BBF125A00859F49 /* AFURLSessionManager.m */,
 				299522461BBF125A00859F49 /* AFHTTPSessionManager.h */,
 				299522471BBF125A00859F49 /* AFHTTPSessionManager.m */,
 				299522491BBF125A00859F49 /* AFNetworkReachabilityManager.h */,
@@ -519,8 +521,6 @@
 				2995224E1BBF125A00859F49 /* AFURLRequestSerialization.m */,
 				2995224F1BBF125A00859F49 /* AFURLResponseSerialization.h */,
 				299522501BBF125A00859F49 /* AFURLResponseSerialization.m */,
-				299522511BBF125A00859F49 /* AFURLSessionManager.h */,
-				299522521BBF125A00859F49 /* AFURLSessionManager.m */,
 			);
 			path = AFNetworking;
 			sourceTree = "<group>";

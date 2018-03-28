@@ -43,8 +43,15 @@
             [self.tableView reloadData];
         }
     }];
+    NSURLSessionTask *task1 = [Post globalTimelinePostsWithBlock:^(NSArray *posts, NSError *error) {
+        if (!error) {
+            self.posts = posts;
+            [self.tableView reloadData];
+        }
+    }];
 
     [self.refreshControl setRefreshingWithStateOfTask:task];
+    [self.refreshControl setRefreshingWithStateOfTask:task1];
 }
 
 #pragma mark - UIViewController

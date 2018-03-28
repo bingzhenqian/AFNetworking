@@ -29,6 +29,7 @@
 #endif
 
 static dispatch_queue_t url_session_manager_creation_queue() {
+    //创建一个 单例 串行队列
     static dispatch_queue_t af_url_session_manager_creation_queue;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -39,10 +40,13 @@ static dispatch_queue_t url_session_manager_creation_queue() {
 }
 
 static void url_session_manager_create_task_safely(dispatch_block_t block) {
+    //ios8.0以下，dataTask异步生成，taskIdentifier重复
     if (NSFoundationVersionNumber < NSFoundationVersionNumber_With_Fixed_5871104061079552_bug) {
         // Fix of bug
         // Open Radar:http://openradar.appspot.com/radar?id=5871104061079552 (status: Fixed in iOS8)
         // Issue about:https://github.com/AFNetworking/AFNetworking/issues/2093
+        // 同步
+        // url_session_manager_creation_queue 单例 串行队列
         dispatch_sync(url_session_manager_creation_queue(), block);
     } else {
         block();
@@ -131,34 +135,39 @@ typedef void (^AFURLSessionTaskCompletionHandler)(NSURLResponse *response, id re
     if (!self) {
         return nil;
     }
-    
+    //返回数据
     _mutableData = [NSMutableData data];
+    //上传进度
     _uploadProgress = [[NSProgress alloc] initWithParent:nil userInfo:nil];
+    //下载进度
     _downloadProgress = [[NSProgress alloc] initWithParent:nil userInfo:nil];
     
     __weak __typeof__(task) weakTask = task;
     for (NSProgress *progress in @[ _uploadProgress, _downloadProgress ])
     {
-        progress.totalUnitCount = NSURLSessionTransferSizeUnknown;
-        progress.cancellable = YES;
+        //NSProgress类
+        progress.totalUnitCount = NSURLSessionTransferSizeUnknown;//总
+        progress.cancellable = YES;//可以取消
         progress.cancellationHandler = ^{
-            [weakTask cancel];
+            [weakTask cancel];//取消事件，取消task 调用-URLSession:task:didCompleteWithError:回调
         };
-        progress.pausable = YES;
+        progress.pausable = YES;//可以暂停
         progress.pausingHandler = ^{
-            [weakTask suspend];
+            [weakTask suspend];//暂停事件，暂停task
         };
 #if __has_warning("-Wunguarded-availability-new")
+        //iOS9 及以上 macOS10.11及以上系统
         if (@available(iOS 9, macOS 10.11, *))
 #else
         if ([progress respondsToSelector:@selector(setResumingHandler:)])
 #endif
         {
-            progress.resumingHandler = ^{
+            //iOS9 及以上 macOS10.11及以上系统才有此属性
+            progress.resumingHandler = ^{//进度恢复
                 [weakTask resume];
             };
         }
-        
+        //添加观察者
         [progress addObserver:self
                    forKeyPath:NSStringFromSelector(@selector(fractionCompleted))
                       options:NSKeyValueObservingOptionNew
@@ -480,31 +489,32 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
     if (!self) {
         return nil;
     }
-
+    //没有传configuration就用默认defaultSessionConfiguration
     if (!configuration) {
         configuration = [NSURLSessionConfiguration defaultSessionConfiguration];
     }
-
+    //把configuration赋给AFURLSessionManager
     self.sessionConfiguration = configuration;
-
+    //代理回调的队列，并发数为1
     self.operationQueue = [[NSOperationQueue alloc] init];
     self.operationQueue.maxConcurrentOperationCount = 1;
-
+    //NSURLSession的委托委托给AFURLSessionManager对象，做进一步处理
     self.session = [NSURLSession sessionWithConfiguration:self.sessionConfiguration delegate:self delegateQueue:self.operationQueue];
-
+    //转码
     self.responseSerializer = [AFJSONResponseSerializer serializer];
-
+    //默认安全策略
     self.securityPolicy = [AFSecurityPolicy defaultPolicy];
 
 #if !TARGET_OS_WATCH
+    //网络状况
     self.reachabilityManager = [AFNetworkReachabilityManager sharedManager];
 #endif
-
+    //存放delegate的字典
     self.mutableTaskDelegatesKeyedByTaskIdentifier = [[NSMutableDictionary alloc] init];
-
+    //保护存放delegate的字典
     self.lock = [[NSLock alloc] init];
     self.lock.name = AFURLSessionManagerLockName;
-
+    //置空所有运行中的task 防止后台回来重新初始化session
     [self.session getTasksWithCompletionHandler:^(NSArray *dataTasks, NSArray *uploadTasks, NSArray *downloadTasks) {
         for (NSURLSessionDataTask *task in dataTasks) {
             [self addDelegateForDataTask:task uploadProgress:nil downloadProgress:nil completionHandler:nil];
@@ -529,6 +539,7 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
 #pragma mark -
 
 - (NSString *)taskDescriptionForSessionTasks {
+    //manager内存地址
     return [NSString stringWithFormat:@"%p", self];
 }
 
@@ -572,9 +583,11 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
 {
     NSParameterAssert(task);
     NSParameterAssert(delegate);
-
+    //锁，保护mutableTaskDelegatesKeyedByTaskIdentifier字典
     [self.lock lock];
+    //可变字典，用来保存task的delegate，键为task生成时的taskIdentifier
     self.mutableTaskDelegatesKeyedByTaskIdentifier[@(task.taskIdentifier)] = delegate;
+    //添加取消，恢复通知
     [self addNotificationObserverForTask:task];
     [self.lock unlock];
 }
@@ -584,14 +597,19 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
               downloadProgress:(nullable void (^)(NSProgress *downloadProgress)) downloadProgressBlock
              completionHandler:(void (^)(NSURLResponse *response, id responseObject, NSError *error))completionHandler
 {
+    //生成AFURLSessionManagerTaskDelegate委托对象，初始化data，progress，给progress配置取消，暂停，恢复方法，用来操作task
     AFURLSessionManagerTaskDelegate *delegate = [[AFURLSessionManagerTaskDelegate alloc] initWithTask:dataTask];
+    //弱引用
     delegate.manager = self;
+    //回调
     delegate.completionHandler = completionHandler;
-
+    //这个taskDescriptionForSessionTasks用来发送开始和挂起通知的时候会用到,就是用这个值来Post通知，来两者对应
     dataTask.taskDescription = self.taskDescriptionForSessionTasks;
+    //保存delegate
     [self setDelegate:delegate forTask:dataTask];
-
+    //上传进度赋值给TaskDelegate
     delegate.uploadProgressBlock = uploadProgressBlock;
+    //下载进度赋值给TaskDelegate
     delegate.downloadProgressBlock = downloadProgressBlock;
 }
 
@@ -722,12 +740,15 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
                                uploadProgress:(nullable void (^)(NSProgress *uploadProgress)) uploadProgressBlock
                              downloadProgress:(nullable void (^)(NSProgress *downloadProgress)) downloadProgressBlock
                             completionHandler:(nullable void (^)(NSURLResponse *response, id _Nullable responseObject,  NSError * _Nullable error))completionHandler {
-
+    //新建dataTask
     __block NSURLSessionDataTask *dataTask = nil;
+    //在同步串行队列中生成dataTask
+    //ios8.0以下，dataTask异步生成，taskIdentifier重复
     url_session_manager_create_task_safely(^{
         dataTask = [self.session dataTaskWithRequest:request];
     });
-
+    //把dataTask的delegate赋值给AFURLSessionManagerTaskDelegate对象的delegate
+    //
     [self addDelegateForDataTask:dataTask uploadProgress:uploadProgressBlock downloadProgress:downloadProgressBlock completionHandler:completionHandler];
 
     return dataTask;
@@ -920,6 +941,7 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
 }
 
 #pragma mark - NSURLSessionDelegate
+//当前这个session已经失效时，该代理方法被调用。
 
 - (void)URLSession:(NSURLSession *)session
 didBecomeInvalidWithError:(NSError *)error
@@ -930,11 +952,19 @@ didBecomeInvalidWithError:(NSError *)error
 
     [[NSNotificationCenter defaultCenter] postNotificationName:AFURLSessionDidInvalidateNotification object:session];
 }
+//2、https认证
 
 - (void)URLSession:(NSURLSession *)session
 didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
  completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *credential))completionHandler
 {
+    //挑战处理类型为 默认
+    /*
+     NSURLSessionAuthChallengePerformDefaultHandling：默认方式处理
+     NSURLSessionAuthChallengeUseCredential：使用指定的证书
+     NSURLSessionAuthChallengeCancelAuthenticationChallenge：取消挑战
+     */
+
     NSURLSessionAuthChallengeDisposition disposition = NSURLSessionAuthChallengePerformDefaultHandling;
     __block NSURLCredential *credential = nil;
 
@@ -963,6 +993,7 @@ didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
 }
 
 #pragma mark - NSURLSessionTaskDelegate
+//被服务器重定向的时候调用
 
 - (void)URLSession:(NSURLSession *)session
               task:(NSURLSessionTask *)task
@@ -971,6 +1002,7 @@ willPerformHTTPRedirection:(NSHTTPURLResponse *)response
  completionHandler:(void (^)(NSURLRequest *))completionHandler
 {
     NSURLRequest *redirectRequest = request;
+    //看是否有对应的block
 
     if (self.taskWillPerformHTTPRedirection) {
         redirectRequest = self.taskWillPerformHTTPRedirection(session, task, response, request);
@@ -1055,15 +1087,20 @@ totalBytesExpectedToSend:(int64_t)totalBytesExpectedToSend
 - (void)URLSession:(NSURLSession *)session
               task:(NSURLSessionTask *)task
 didCompleteWithError:(NSError *)error
-{
+{    //按照task的taskIdentifier从mutableTaskDelegatesKeyedByTaskIdentifier字典中取出委托
+
     AFURLSessionManagerTaskDelegate *delegate = [self delegateForTask:task];
 
     // delegate may be nil when completing a task in the background
     if (delegate) {
+        //事件交给task delegate处理
+
         [delegate URLSession:session task:task didCompleteWithError:error];
+        //task移除delegate
 
         [self removeDelegateForTask:task];
     }
+    //如果设置了block回调，调用
 
     if (self.taskDidComplete) {
         self.taskDidComplete(session, task, error);
@@ -1229,3 +1266,20 @@ expectedTotalBytes:(int64_t)expectedTotalBytes
 }
 
 @end
+/**
+ 个人总结，AFURLSessionManager initWithSessionConfiguration 初始化一个manager
+ 方法里面初始化一个NSURLSession，初始化mutableTaskDelegatesKeyedByTaskIdentifier字典，用来存放task的delegate，NSLock保证字典安全
+ 调用getTasksWithCompletionHandler，在里面置空task的回调
+ 添加任务挂起，恢复的通知
+ 
+ 调用 【manager dataTaskWithRequest：completionHandler：】方法
+ 生成一个dataTask对象 这边在串行同步队列里生成，为了task的taskIdentifiers唯一
+ 调用系统的 self.session dataTaskWithRequest：方法
+ 为dataTask设置回调
+ 为dataTask创建AFURLSessionManagerTaskDelegate类型回调delegate，里面包括返回数据，进度，下载文件目的存储地址等
+ 设置回调，将delegate放入taskIdentifier标记的字典中，同一session中taskIdentifier唯一，让delegate和task一一对应
+ 返回task
+ 
+ task resume
+ 
+ */

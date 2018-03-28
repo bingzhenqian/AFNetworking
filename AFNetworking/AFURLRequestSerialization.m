@@ -357,22 +357,23 @@ forHTTPHeaderField:(NSString *)field
                                 parameters:(id)parameters
                                      error:(NSError *__autoreleasing *)error
 {
+    //Debug情况下，检查method和URLString是否空，空就crash
     NSParameterAssert(method);
     NSParameterAssert(URLString);
 
     NSURL *url = [NSURL URLWithString:URLString];
 
     NSParameterAssert(url);
-
+    //请求方式
     NSMutableURLRequest *mutableRequest = [[NSMutableURLRequest alloc] initWithURL:url];
     mutableRequest.HTTPMethod = method;
-
+    //将request属性循环遍历
     for (NSString *keyPath in AFHTTPRequestSerializerObservedKeyPaths()) {
         if ([self.mutableObservedChangedKeyPaths containsObject:keyPath]) {
             [mutableRequest setValue:[self valueForKeyPath:keyPath] forKey:keyPath];
         }
     }
-
+    //将传入的parameters进行编码，添加到request中
     mutableRequest = [[self requestBySerializingRequest:mutableRequest withParameters:parameters error:error] mutableCopy];
 
 	return mutableRequest;
@@ -506,12 +507,13 @@ forHTTPHeaderField:(NSString *)field
             }
         }
     }
-
+    //判断是否包含了GET，HEAD，DELETE（用HTTPMethodsEncodingParametersInURI），包含了就把参数拼接到url后面
     if ([self.HTTPMethodsEncodingParametersInURI containsObject:[[request HTTPMethod] uppercaseString]]) {
         if (query && query.length > 0) {
             mutableRequest.URL = [NSURL URLWithString:[[mutableRequest.URL absoluteString] stringByAppendingFormat:mutableRequest.URL.query ? @"&%@" : @"?%@", query]];
         }
     } else {
+        //设置body
         // #2864: an empty string is a valid x-www-form-urlencoded payload
         if (!query) {
             query = @"";

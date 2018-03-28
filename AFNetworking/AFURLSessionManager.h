@@ -498,3 +498,25 @@ FOUNDATION_EXPORT NSString * const AFNetworkingTaskDidCompleteAssetPathKey;
 FOUNDATION_EXPORT NSString * const AFNetworkingTaskDidCompleteErrorKey;
 
 NS_ASSUME_NONNULL_END
+#pragma mark - 参考网站
+//https://www.jianshu.com/p/856f0e26279d
+//http://www.cocoachina.com/ios/20161209/18277.html
+//https://blog.csdn.net/u013378438/article/details/51926447
+
+/**
+ 个人总结，AFURLSessionManager initWithSessionConfiguration 初始化一个manager
+        方法里面初始化一个NSURLSession，初始化mutableTaskDelegatesKeyedByTaskIdentifier字典，用来存放task的delegate，NSLock保证字典安全
+        调用getTasksWithCompletionHandler，在里面置空task的回调
+        添加任务挂起，恢复的通知
+ 
+    调用 【manager dataTaskWithRequest：completionHandler：】方法
+        生成一个dataTask对象 这边在串行同步队列里生成，为了task的taskIdentifiers唯一
+        调用系统的 self.session dataTaskWithRequest：方法
+        为dataTask设置回调
+        为dataTask创建AFURLSessionManagerTaskDelegate类型回调delegate，里面包括返回数据，进度，下载文件目的存储地址等
+        设置回调，将delegate放入taskIdentifier标记的字典中，同一session中taskIdentifier唯一，让delegate和task一一对应
+        返回task
+ 
+    task resume
+ 
+ */

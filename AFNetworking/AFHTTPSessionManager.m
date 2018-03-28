@@ -62,10 +62,11 @@
 - (instancetype)initWithSessionConfiguration:(NSURLSessionConfiguration *)configuration {
     return [self initWithBaseURL:nil sessionConfiguration:configuration];
 }
-
+//初始化方法都会调用此方法
 - (instancetype)initWithBaseURL:(NSURL *)url
            sessionConfiguration:(NSURLSessionConfiguration *)configuration
 {
+    //初始化AFHTTPSessionManager
     self = [super initWithSessionConfiguration:configuration];
     if (!self) {
         return nil;
@@ -132,7 +133,7 @@
                       success:(void (^)(NSURLSessionDataTask * _Nonnull, id _Nullable))success
                       failure:(void (^)(NSURLSessionDataTask * _Nullable, NSError * _Nonnull))failure
 {
-
+    //生成task Get方式
     NSURLSessionDataTask *dataTask = [self dataTaskWithHTTPMethod:@"GET"
                                                         URLString:URLString
                                                        parameters:parameters
@@ -140,7 +141,7 @@
                                                  downloadProgress:downloadProgress
                                                           success:success
                                                           failure:failure];
-
+    //开始请求
     [dataTask resume];
 
     return dataTask;
@@ -273,18 +274,21 @@
                                          failure:(void (^)(NSURLSessionDataTask *, NSError *))failure
 {
     NSError *serializationError = nil;
+    //拼装request
     NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:method URLString:[[NSURL URLWithString:URLString relativeToURL:self.baseURL] absoluteString] parameters:parameters error:&serializationError];
+    //拼装失败，异步主线程回调
     if (serializationError) {
         if (failure) {
             dispatch_async(self.completionQueue ?: dispatch_get_main_queue(), ^{
                 failure(nil, serializationError);
             });
         }
-
+        //返回
         return nil;
     }
-
+    
     __block NSURLSessionDataTask *dataTask = nil;
+    
     dataTask = [self dataTaskWithRequest:request
                           uploadProgress:uploadProgress
                         downloadProgress:downloadProgress
