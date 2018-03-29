@@ -25,10 +25,10 @@
 #import "AFURLSessionManager.h"
 
 typedef NS_ENUM(NSInteger, AFNetworkActivityManagerState) {
-    AFNetworkActivityManagerStateNotActive,
-    AFNetworkActivityManagerStateDelayingStart,
-    AFNetworkActivityManagerStateActive,
-    AFNetworkActivityManagerStateDelayingEnd
+    AFNetworkActivityManagerStateNotActive,//无请求
+    AFNetworkActivityManagerStateDelayingStart,//延迟开始
+    AFNetworkActivityManagerStateActive,//请求中
+    AFNetworkActivityManagerStateDelayingEnd//延迟结束
 };
 
 static NSTimeInterval const kDefaultAFNetworkActivityManagerActivationDelay = 1.0;
@@ -77,8 +77,8 @@ typedef void (^AFNetworkActivityActionBlock)(BOOL networkActivityIndicatorVisibl
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(networkRequestDidStart:) name:AFNetworkingTaskDidResumeNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(networkRequestDidFinish:) name:AFNetworkingTaskDidSuspendNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(networkRequestDidFinish:) name:AFNetworkingTaskDidCompleteNotification object:nil];
-    self.activationDelay = kDefaultAFNetworkActivityManagerActivationDelay;
-    self.completionDelay = kDefaultAFNetworkActivityManagerCompletionDelay;
+    self.activationDelay = kDefaultAFNetworkActivityManagerActivationDelay;//最短时间间隔
+    self.completionDelay = kDefaultAFNetworkActivityManagerCompletionDelay;//请求完成延迟时间间隔0.17秒
 
     return self;
 }
@@ -108,8 +108,11 @@ typedef void (^AFNetworkActivityActionBlock)(BOOL networkActivityIndicatorVisibl
 }
 
 - (void)setNetworkActivityIndicatorVisible:(BOOL)networkActivityIndicatorVisible {
+    //状态不一致
     if (_networkActivityIndicatorVisible != networkActivityIndicatorVisible) {
+        //手动KVO
         [self willChangeValueForKey:@"networkActivityIndicatorVisible"];
+        //锁，防止其他线程请求影响
         @synchronized(self) {
              _networkActivityIndicatorVisible = networkActivityIndicatorVisible;
         }
@@ -133,6 +136,7 @@ typedef void (^AFNetworkActivityActionBlock)(BOOL networkActivityIndicatorVisibl
 }
 
 - (void)incrementActivityCount {
+    //手动KVO
     [self willChangeValueForKey:@"activityCount"];
 	@synchronized(self) {
 		_activityCount++;
@@ -145,7 +149,9 @@ typedef void (^AFNetworkActivityActionBlock)(BOOL networkActivityIndicatorVisibl
 }
 
 - (void)decrementActivityCount {
+    //手动KVO
     [self willChangeValueForKey:@"activityCount"];
+    //@synchronized 锁
 	@synchronized(self) {
 		_activityCount = MAX(_activityCount - 1, 0);
 	}
@@ -158,12 +164,14 @@ typedef void (^AFNetworkActivityActionBlock)(BOOL networkActivityIndicatorVisibl
 
 - (void)networkRequestDidStart:(NSNotification *)notification {
     if ([AFNetworkRequestFromNotification(notification) URL]) {
+        //增加请求活跃数
         [self incrementActivityCount];
     }
 }
 
 - (void)networkRequestDidFinish:(NSNotification *)notification {
     if ([AFNetworkRequestFromNotification(notification) URL]) {
+        //减少请求活跃数
         [self decrementActivityCount];
     }
 }
@@ -181,13 +189,16 @@ typedef void (^AFNetworkActivityActionBlock)(BOOL networkActivityIndicatorVisibl
                     [self setNetworkActivityIndicatorVisible:NO];
                     break;
                 case AFNetworkActivityManagerStateDelayingStart:
-                    [self startActivationDelayTimer];
+                    [self startActivationDelayTimer];//NSTimer延迟开始转
                     break;
                 case AFNetworkActivityManagerStateActive:
+                    //取消延迟完成的timer
                     [self cancelCompletionDelayTimer];
+                    //开始转菊花
                     [self setNetworkActivityIndicatorVisible:YES];
                     break;
                 case AFNetworkActivityManagerStateDelayingEnd:
+                    //延迟完成Timer
                     [self startCompletionDelayTimer];
                     break;
             }
@@ -198,11 +209,12 @@ typedef void (^AFNetworkActivityActionBlock)(BOOL networkActivityIndicatorVisibl
 }
 
 - (void)updateCurrentStateForNetworkActivityChange {
+    //是否允许
     if (self.enabled) {
         switch (self.currentState) {
-            case AFNetworkActivityManagerStateNotActive:
-                if (self.isNetworkActivityOccurring) {
-                    [self setCurrentState:AFNetworkActivityManagerStateDelayingStart];
+            case AFNetworkActivityManagerStateNotActive://无活动
+                if (self.isNetworkActivityOccurring) {//>0
+                    [self setCurrentState:AFNetworkActivityManagerStateDelayingStart];//状态延迟开始调用set方法
                 }
                 break;
             case AFNetworkActivityManagerStateDelayingStart:
@@ -225,6 +237,7 @@ typedef void (^AFNetworkActivityActionBlock)(BOOL networkActivityIndicatorVisibl
 - (void)startActivationDelayTimer {
     self.activationDelayTimer = [NSTimer
                                  timerWithTimeInterval:self.activationDelay target:self selector:@selector(activationDelayTimerFired) userInfo:nil repeats:NO];
+    //
     [[NSRunLoop mainRunLoop] addTimer:self.activationDelayTimer forMode:NSRunLoopCommonModes];
 }
 

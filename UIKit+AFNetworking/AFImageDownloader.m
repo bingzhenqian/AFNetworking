@@ -180,7 +180,7 @@
 
     return self;
 }
-
+//单例
 + (instancetype)defaultInstance {
     static AFImageDownloader *sharedInstance = nil;
     static dispatch_once_t onceToken;

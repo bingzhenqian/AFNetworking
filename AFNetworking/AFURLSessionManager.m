@@ -197,26 +197,29 @@ typedef void (^AFURLSessionTaskCompletionHandler)(NSURLResponse *response, id re
 }
 
 #pragma mark - NSURLSessionTaskDelegate
-
+//从NSURLSession的delegate转发过来
 - (void)URLSession:(__unused NSURLSession *)session
               task:(NSURLSessionTask *)task
 didCompleteWithError:(NSError *)error
 {
+    //强引用，防止提前释放
     __strong AFURLSessionManager *manager = self.manager;
 
     __block id responseObject = nil;
 
     __block NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
+    //存储
     userInfo[AFNetworkingTaskDidCompleteResponseSerializerKey] = manager.responseSerializer;
 
     //Performance Improvement from #2672
     NSData *data = nil;
+    //如果有值，把值赋给data，mutableData置为nil
     if (self.mutableData) {
         data = [self.mutableData copy];
         //We no longer need the reference, so nil it out to gain back some memory.
         self.mutableData = nil;
     }
-
+    //userinfo赋值
     if (self.downloadFileURL) {
         userInfo[AFNetworkingTaskDidCompleteAssetPathKey] = self.downloadFileURL;
     } else if (data) {
@@ -224,39 +227,42 @@ didCompleteWithError:(NSError *)error
     }
 
     if (error) {
+        //有错误
         userInfo[AFNetworkingTaskDidCompleteErrorKey] = error;
-
+        //异步主线程中（completionQueue没有设置就是在主线程）回调
         dispatch_group_async(manager.completionGroup ?: url_session_manager_completion_group(), manager.completionQueue ?: dispatch_get_main_queue(), ^{
             if (self.completionHandler) {
                 self.completionHandler(task.response, responseObject, error);
             }
-
+            //发送完成通知
             dispatch_async(dispatch_get_main_queue(), ^{
                 [[NSNotificationCenter defaultCenter] postNotificationName:AFNetworkingTaskDidCompleteNotification object:task userInfo:userInfo];
             });
         });
     } else {
+        //异步并行队列
         dispatch_async(url_session_manager_processing_queue(), ^{
             NSError *serializationError = nil;
+            //解析数据 费时所以在并行线程中做
             responseObject = [manager.responseSerializer responseObjectForResponse:task.response data:data error:&serializationError];
-
+            //下载数据，responseObject为下载的路径
             if (self.downloadFileURL) {
                 responseObject = self.downloadFileURL;
             }
-
+            //
             if (responseObject) {
                 userInfo[AFNetworkingTaskDidCompleteSerializedResponseKey] = responseObject;
             }
-
+            //解析错误
             if (serializationError) {
                 userInfo[AFNetworkingTaskDidCompleteErrorKey] = serializationError;
             }
-
+            //异步主线程中（completionQueue没有设置就是在主线程）回调
             dispatch_group_async(manager.completionGroup ?: url_session_manager_completion_group(), manager.completionQueue ?: dispatch_get_main_queue(), ^{
                 if (self.completionHandler) {
                     self.completionHandler(task.response, responseObject, serializationError);
                 }
-
+                //发送完成通知
                 dispatch_async(dispatch_get_main_queue(), ^{
                     [[NSNotificationCenter defaultCenter] postNotificationName:AFNetworkingTaskDidCompleteNotification object:task userInfo:userInfo];
                 });
@@ -271,9 +277,10 @@ didCompleteWithError:(NSError *)error
           dataTask:(__unused NSURLSessionDataTask *)dataTask
     didReceiveData:(NSData *)data
 {
+    //已下载数据大小
     self.downloadProgress.totalUnitCount = dataTask.countOfBytesExpectedToReceive;
     self.downloadProgress.completedUnitCount = dataTask.countOfBytesReceived;
-
+    //拼接数据
     [self.mutableData appendData:data];
 }
 
@@ -310,13 +317,15 @@ expectedTotalBytes:(int64_t)expectedTotalBytes{
 didFinishDownloadingToURL:(NSURL *)location
 {
     self.downloadFileURL = nil;
-
+    //自定义block
     if (self.downloadTaskDidFinishDownloading) {
+        //自定义下载地址
         self.downloadFileURL = self.downloadTaskDidFinishDownloading(session, downloadTask, location);
         if (self.downloadFileURL) {
             NSError *fileManagerError = nil;
-
+            //把下载路径移动到我们自定义的下载路径
             if (![[NSFileManager defaultManager] moveItemAtURL:location toURL:self.downloadFileURL error:&fileManagerError]) {
+                //失败发送失败通知
                 [[NSNotificationCenter defaultCenter] postNotificationName:AFURLSessionDownloadTaskDidFailToMoveFileNotification object:downloadTask userInfo:fileManagerError.userInfo];
             }
         }
@@ -335,13 +344,13 @@ didFinishDownloadingToURL:(NSURL *)location
  *  - https://github.com/AFNetworking/AFNetworking/issues/2638
  *  - https://github.com/AFNetworking/AFNetworking/pull/2702
  */
-
+//替换函数
 static inline void af_swizzleSelector(Class theClass, SEL originalSelector, SEL swizzledSelector) {
     Method originalMethod = class_getInstanceMethod(theClass, originalSelector);
     Method swizzledMethod = class_getInstanceMethod(theClass, swizzledSelector);
     method_exchangeImplementations(originalMethod, swizzledMethod);
 }
-
+//动态添加方法
 static inline BOOL af_addMethod(Class theClass, SEL selector, Method method) {
     return class_addMethod(theClass, selector,  method_getImplementation(method),  method_getTypeEncoding(method));
 }
@@ -360,7 +369,7 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
      WARNING: Trouble Ahead
      https://github.com/AFNetworking/AFNetworking/pull/2702
      */
-
+    //runtime机制，获取类
     if (NSClassFromString(@"NSURLSessionTask")) {
         /**
          iOS 7 and iOS 8 differ in NSURLSessionTask implementation, which makes the next bit of code a bit tricky.
@@ -430,7 +439,7 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
     NSAssert(NO, @"State method should never be called in the actual dummy class");
     return NSURLSessionTaskStateCanceling;
 }
-
+//替换方法
 - (void)af_resume {
     NSAssert([self respondsToSelector:@selector(state)], @"Does not respond to state");
     NSURLSessionTaskState state = [self state];
@@ -654,7 +663,9 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
     NSParameterAssert(task);
 
     [self.lock lock];
+    //移除通知
     [self removeNotificationObserverForTask:task];
+    //按照taskIdentifier移除delegate
     [self.mutableTaskDelegatesKeyedByTaskIdentifier removeObjectForKey:@(task.taskIdentifier)];
     [self.lock unlock];
 }
@@ -971,6 +982,8 @@ didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
     if (self.sessionDidReceiveAuthenticationChallenge) {
         disposition = self.sessionDidReceiveAuthenticationChallenge(session, challenge, &credential);
     } else {
+        //protectionSpace 接收器的保护空间。保护空间对象提供有关身份验证请求的附加信息，例如主机，端口，身份验证领域等。 保护空间还会告知您身份验证质询是要求您提供用户的凭据还是验证服务器提供的TLS凭据。
+        //证书是否被信任
         if ([challenge.protectionSpace.authenticationMethod isEqualToString:NSURLAuthenticationMethodServerTrust]) {
             if ([self.securityPolicy evaluateServerTrust:challenge.protectionSpace.serverTrust forDomain:challenge.protectionSpace.host]) {
                 credential = [NSURLCredential credentialForTrust:challenge.protectionSpace.serverTrust];
@@ -1097,41 +1110,51 @@ didCompleteWithError:(NSError *)error
 
         [delegate URLSession:session task:task didCompleteWithError:error];
         //task移除delegate
-
         [self removeDelegateForTask:task];
     }
     //如果设置了block回调，调用
-
     if (self.taskDidComplete) {
         self.taskDidComplete(session, task, error);
     }
 }
 
 #pragma mark - NSURLSessionDataDelegate
-
+//收到服务器响应后调用
+//通过传入disposition变量来决定传输任务接下来干什么
 - (void)URLSession:(NSURLSession *)session
           dataTask:(NSURLSessionDataTask *)dataTask
 didReceiveResponse:(NSURLResponse *)response
  completionHandler:(void (^)(NSURLSessionResponseDisposition disposition))completionHandler
 {
+    //设置为继续进行
+    /*
+     NSURLSessionResponseAllow 该task正常进行
+     NSURLSessionResponseCancel 该task会被取消
+     NSURLSessionResponseBecomeDownload 会调用URLSession:dataTask:didBecomeDownloadTask:方法来新建一个download task以代替当前的data task
+     NSURLSessionResponseBecomeStream 转成一个StreamTask
+    */
     NSURLSessionResponseDisposition disposition = NSURLSessionResponseAllow;
-
+    //如果自己设置了[manager setDataTaskDidReceiveResponse:]那就用自己设置的
     if (self.dataTaskDidReceiveResponse) {
         disposition = self.dataTaskDidReceiveResponse(session, dataTask, response);
     }
-
+    //回调
     if (completionHandler) {
         completionHandler(disposition);
     }
 }
 
+//上面代理设置为NSURLSessionResponseBecomeDownload，则会调用这个方法 告诉委托已经转变为下载任务
 - (void)URLSession:(NSURLSession *)session
           dataTask:(NSURLSessionDataTask *)dataTask
 didBecomeDownloadTask:(NSURLSessionDownloadTask *)downloadTask
 {
+    //转变task，重新设置委托
     AFURLSessionManagerTaskDelegate *delegate = [self delegateForTask:dataTask];
     if (delegate) {
+        //移除datatask的委托 从字典中
         [self removeDelegateForTask:dataTask];
+        //为downloadTask设置委托 字典中
         [self setDelegate:delegate forTask:downloadTask];
     }
 
@@ -1139,27 +1162,28 @@ didBecomeDownloadTask:(NSURLSessionDownloadTask *)downloadTask
         self.dataTaskDidBecomeDownloadTask(session, dataTask, downloadTask);
     }
 }
-
+//获取到数据会被反复调用
 - (void)URLSession:(NSURLSession *)session
           dataTask:(NSURLSessionDataTask *)dataTask
     didReceiveData:(NSData *)data
 {
 
     AFURLSessionManagerTaskDelegate *delegate = [self delegateForTask:dataTask];
+    //转发给AFURLSessionManagerTaskDelegate对象
     [delegate URLSession:session dataTask:dataTask didReceiveData:data];
 
     if (self.dataTaskDidReceiveData) {
         self.dataTaskDidReceiveData(session, dataTask, data);
     }
 }
-
+//询问data task或上传任务（upload task）是否缓存response
 - (void)URLSession:(NSURLSession *)session
           dataTask:(NSURLSessionDataTask *)dataTask
  willCacheResponse:(NSCachedURLResponse *)proposedResponse
  completionHandler:(void (^)(NSCachedURLResponse *cachedResponse))completionHandler
 {
     NSCachedURLResponse *cachedResponse = proposedResponse;
-
+    //如果自己设置了用自己的
     if (self.dataTaskWillCacheResponse) {
         cachedResponse = self.dataTaskWillCacheResponse(session, dataTask, proposedResponse);
     }
@@ -1178,7 +1202,7 @@ didBecomeDownloadTask:(NSURLSessionDownloadTask *)downloadTask
 }
 
 #pragma mark - NSURLSessionDownloadDelegate
-
+//下载完成回调
 - (void)URLSession:(NSURLSession *)session
       downloadTask:(NSURLSessionDownloadTask *)downloadTask
 didFinishDownloadingToURL:(NSURL *)location
@@ -1189,7 +1213,7 @@ didFinishDownloadingToURL:(NSURL *)location
         if (fileURL) {
             delegate.downloadFileURL = fileURL;
             NSError *error = nil;
-            
+            //移动下载
             if (![[NSFileManager defaultManager] moveItemAtURL:location toURL:fileURL error:&error]) {
                 [[NSNotificationCenter defaultCenter] postNotificationName:AFURLSessionDownloadTaskDidFailToMoveFileNotification object:downloadTask userInfo:error.userInfo];
             }
@@ -1220,7 +1244,7 @@ totalBytesExpectedToWrite:(int64_t)totalBytesExpectedToWrite
         self.downloadTaskDidWriteData(session, downloadTask, bytesWritten, totalBytesWritten, totalBytesExpectedToWrite);
     }
 }
-
+//断点续传相关函数
 - (void)URLSession:(NSURLSession *)session
       downloadTask:(NSURLSessionDownloadTask *)downloadTask
  didResumeAtOffset:(int64_t)fileOffset
