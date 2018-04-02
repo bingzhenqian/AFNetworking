@@ -575,10 +575,10 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
 }
 
 #pragma mark -
-
+//取出task的委托
 - (AFURLSessionManagerTaskDelegate *)delegateForTask:(NSURLSessionTask *)task {
     NSParameterAssert(task);
-
+    //按照task.taskIdentifier从mutableTaskDelegatesKeyedByTaskIdentifier字典中取出委托
     AFURLSessionManagerTaskDelegate *delegate = nil;
     [self.lock lock];
     delegate = self.mutableTaskDelegatesKeyedByTaskIdentifier[@(task.taskIdentifier)];
@@ -586,7 +586,7 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
 
     return delegate;
 }
-
+//删除task的委托
 - (void)setDelegate:(AFURLSessionManagerTaskDelegate *)delegate
             forTask:(NSURLSessionTask *)task
 {
@@ -600,7 +600,7 @@ static NSString * const AFNSURLSessionTaskDidSuspendNotification = @"com.alamofi
     [self addNotificationObserverForTask:task];
     [self.lock unlock];
 }
-
+//添加自定义委托AFURLSessionManagerTaskDelegate
 - (void)addDelegateForDataTask:(NSURLSessionDataTask *)dataTask
                 uploadProgress:(nullable void (^)(NSProgress *uploadProgress)) uploadProgressBlock
               downloadProgress:(nullable void (^)(NSProgress *downloadProgress)) downloadProgressBlock
