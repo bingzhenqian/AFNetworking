@@ -502,6 +502,7 @@ NS_ASSUME_NONNULL_END
 //https://www.jianshu.com/p/856f0e26279d
 //http://www.cocoachina.com/ios/20161209/18277.html
 //https://blog.csdn.net/u013378438/article/details/51926447
+//http://www.cnblogs.com/polobymulberry/p/5081049.html
 
 /**
  个人总结，AFURLSessionManager initWithSessionConfiguration 初始化一个manager

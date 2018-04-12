@@ -275,6 +275,17 @@
 {
     NSError *serializationError = nil;
     //拼装request
+    /*https://blog.csdn.net/wang631106979/article/details/52243028
+     requestSerializer
+     关于 requestSerializer它就是AFNetworking参数编码的序列化器，它一共有三种编码格式：
+     
+     AFHTTPRequestSerializer：第一种是普通的http的编码格式也就是mid=10&method=userInfo&dateInt=20160818，这种格式的。
+     
+     AFJSONRequestSerializer：第二种也是json编码格式的，也就是编码成{"mid":"11","method":"userInfo","dateInt":"20160818"}
+     
+     AFPropertyListRequestSerializer：第三种没用过，但是看介绍接编码成pislt格式的参数
+     **/
+
     NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:method URLString:[[NSURL URLWithString:URLString relativeToURL:self.baseURL] absoluteString] parameters:parameters error:&serializationError];
     //拼装失败，异步主线程回调
     if (serializationError) {

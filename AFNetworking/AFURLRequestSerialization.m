@@ -360,7 +360,7 @@ forHTTPHeaderField:(NSString *)field
     //Debug情况下，检查method和URLString是否空，空就crash
     NSParameterAssert(method);
     NSParameterAssert(URLString);
-
+    
     NSURL *url = [NSURL URLWithString:URLString];
 
     NSParameterAssert(url);
@@ -476,10 +476,11 @@ forHTTPHeaderField:(NSString *)field
                                withParameters:(id)parameters
                                         error:(NSError *__autoreleasing *)error
 {
+    //request是否存在
     NSParameterAssert(request);
 
     NSMutableURLRequest *mutableRequest = [request mutableCopy];
-
+    //添加HTTPHeader
     [self.HTTPRequestHeaders enumerateKeysAndObjectsUsingBlock:^(id field, id value, BOOL * __unused stop) {
         if (![request valueForHTTPHeaderField:field]) {
             [mutableRequest setValue:value forHTTPHeaderField:field];
@@ -513,7 +514,7 @@ forHTTPHeaderField:(NSString *)field
             mutableRequest.URL = [NSURL URLWithString:[[mutableRequest.URL absoluteString] stringByAppendingFormat:mutableRequest.URL.query ? @"&%@" : @"?%@", query]];
         }
     } else {
-        //设置body
+        //post 设置body  提交的数据按照 key1=val1&key2=val2 的方式进行编码
         // #2864: an empty string is a valid x-www-form-urlencoded payload
         if (!query) {
             query = @"";
@@ -1243,7 +1244,8 @@ typedef enum {
                                         error:(NSError *__autoreleasing *)error
 {
     NSParameterAssert(request);
-
+    //判断是否包含了GET，HEAD，DELETE（用HTTPMethodsEncodingParametersInURI），包含了就
+    //调用AFHTTPRequestSerializer的requestBySerializingRequest方法
     if ([self.HTTPMethodsEncodingParametersInURI containsObject:[[request HTTPMethod] uppercaseString]]) {
         return [super requestBySerializingRequest:request withParameters:parameters error:error];
     }
@@ -1255,7 +1257,7 @@ typedef enum {
             [mutableRequest setValue:value forHTTPHeaderField:field];
         }
     }];
-
+    //json格式提交数据
     if (parameters) {
         if (![mutableRequest valueForHTTPHeaderField:@"Content-Type"]) {
             [mutableRequest setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
@@ -1268,13 +1270,13 @@ typedef enum {
             }
             return nil;
         }
-
+        //组装数据
         NSData *jsonData = [NSJSONSerialization dataWithJSONObject:parameters options:self.writingOptions error:error];
         
         if (!jsonData) {
             return nil;
         }
-        
+        //添加HTTPBody
         [mutableRequest setHTTPBody:jsonData];
     }
 
@@ -1348,7 +1350,7 @@ typedef enum {
             [mutableRequest setValue:value forHTTPHeaderField:field];
         }
     }];
-
+    //plist方式组装数据
     if (parameters) {
         if (![mutableRequest valueForHTTPHeaderField:@"Content-Type"]) {
             [mutableRequest setValue:@"application/x-plist" forHTTPHeaderField:@"Content-Type"];

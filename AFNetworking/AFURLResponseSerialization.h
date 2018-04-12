@@ -21,7 +21,7 @@
 
 #import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
-
+//参考https://blog.csdn.net/yuwuchaio/article/details/50457310
 NS_ASSUME_NONNULL_BEGIN
 
 /**
