@@ -71,7 +71,7 @@
     if (!self) {
         return nil;
     }
-
+    //确保baseURL路径的终端斜线，以便NSURL + URLWithString：relativeToURL：按预期工作
     // Ensure terminal slash for baseURL path, so that NSURL +URLWithString:relativeToURL: works as expected
     if ([[url path] length] > 0 && ![[url absoluteString] hasSuffix:@"/"]) {
         url = [url URLByAppendingPathComponent:@""];
@@ -133,7 +133,7 @@
                       success:(void (^)(NSURLSessionDataTask * _Nonnull, id _Nullable))success
                       failure:(void (^)(NSURLSessionDataTask * _Nullable, NSError * _Nonnull))failure
 {
-    //生成task Get方式
+    //生成task Get方式 调用 AFURLSessionManager方法
     NSURLSessionDataTask *dataTask = [self dataTaskWithHTTPMethod:@"GET"
                                                         URLString:URLString
                                                        parameters:parameters

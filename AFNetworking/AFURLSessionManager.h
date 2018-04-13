@@ -76,7 +76,7 @@
  ## NSCoding Caveats
 
  - Encoded managers do not include any block properties. Be sure to set delegate callback blocks when using `-initWithCoder:` or `NSKeyedUnarchiver`.
-
+- 编码管理器不包含任何块属性。 使用`-initWithCoder：`或'NSKeyedUnarchiver`时，务必设置委托回调块。
  ## NSCopying Caveats
 
  - `-copy` and `-copyWithZone:` return a new manager with a new `NSURLSession` created from the configuration of the original.
@@ -92,11 +92,13 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  The managed session.
  */
+//NSURLSession
 @property (readonly, nonatomic, strong) NSURLSession *session;
 
 /**
  The operation queue on which delegate callbacks are run.
  */
+//回调队列
 @property (readonly, nonatomic, strong) NSOperationQueue *operationQueue;
 
 /**
@@ -104,6 +106,7 @@ NS_ASSUME_NONNULL_BEGIN
 
  @warning `responseSerializer` must not be `nil`.
  */
+//反序列化对象
 @property (nonatomic, strong) id <AFURLResponseSerialization> responseSerializer;
 
 ///-------------------------------
@@ -113,6 +116,8 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  The security policy used by created session to evaluate server trust for secure connections. `AFURLSessionManager` uses the `defaultPolicy` unless otherwise specified.
  */
+
+//安全策略
 @property (nonatomic, strong) AFSecurityPolicy *securityPolicy;
 
 #if !TARGET_OS_WATCH
@@ -123,6 +128,7 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  The network reachability manager. `AFURLSessionManager` uses the `sharedManager` by default.
  */
+//网络状态
 @property (readwrite, nonatomic, strong) AFNetworkReachabilityManager *reachabilityManager;
 #endif
 
@@ -133,6 +139,7 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  The data, upload, and download tasks currently run by the managed session.
  */
+//各种任务task
 @property (readonly, nonatomic, strong) NSArray <NSURLSessionTask *> *tasks;
 
 /**
@@ -157,11 +164,13 @@ NS_ASSUME_NONNULL_BEGIN
 /**
  The dispatch queue for `completionBlock`. If `NULL` (default), the main queue is used.
  */
+//请求完成队列
 @property (nonatomic, strong, nullable) dispatch_queue_t completionQueue;
 
 /**
  The dispatch group for `completionBlock`. If `NULL` (default), a private dispatch group is used.
  */
+//请求完成组
 @property (nonatomic, strong, nullable) dispatch_group_t completionGroup;
 
 ///---------------------------------
