@@ -36,7 +36,16 @@
 
 - (void)reload:(__unused id)sender {
     self.navigationItem.rightBarButtonItem.enabled = NO;
+    NSString *str1 = @"abc";
+    NSString *str2 = @"abc";
+    
+    if(str1 == str2){
+        NSLog(@"YES");
+    }else{
+        NSLog(@"NO");
 
+    }
+    
     NSURLSessionTask *task = [Post globalTimelinePostsWithBlock:^(NSArray *posts, NSError *error) {
         if (!error) {
             self.posts = posts;

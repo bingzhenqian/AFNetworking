@@ -114,13 +114,18 @@ typedef void (^AFURLSessionTaskCompletionHandler)(NSURLResponse *response, id re
 
 
 #pragma mark -
-
+//AFURLSessionManager代理
 @interface AFURLSessionManagerTaskDelegate : NSObject <NSURLSessionTaskDelegate, NSURLSessionDataDelegate, NSURLSessionDownloadDelegate>
 - (instancetype)initWithTask:(NSURLSessionTask *)task;
+//弱引用
 @property (nonatomic, weak) AFURLSessionManager *manager;
+//请求回来数据
 @property (nonatomic, strong) NSMutableData *mutableData;
+//上传进度
 @property (nonatomic, strong) NSProgress *uploadProgress;
+//下载进度
 @property (nonatomic, strong) NSProgress *downloadProgress;
+//文件下载路径
 @property (nonatomic, copy) NSURL *downloadFileURL;
 @property (nonatomic, copy) AFURLSessionDownloadTaskDidFinishDownloadingBlock downloadTaskDidFinishDownloading;
 @property (nonatomic, copy) AFURLSessionTaskProgressBlock uploadProgressBlock;
@@ -143,6 +148,7 @@ typedef void (^AFURLSessionTaskCompletionHandler)(NSURLResponse *response, id re
     _downloadProgress = [[NSProgress alloc] initWithParent:nil userInfo:nil];
     
     __weak __typeof__(task) weakTask = task;
+    //设置进度回调，顺便用cancellationHandler把progress和task的取消暂停事件绑定
     for (NSProgress *progress in @[ _uploadProgress, _downloadProgress ])
     {
         //NSProgress类
@@ -175,14 +181,14 @@ typedef void (^AFURLSessionTaskCompletionHandler)(NSURLResponse *response, id re
     }
     return self;
 }
-
+//移除观察者
 - (void)dealloc {
     [self.downloadProgress removeObserver:self forKeyPath:NSStringFromSelector(@selector(fractionCompleted))];
     [self.uploadProgress removeObserver:self forKeyPath:NSStringFromSelector(@selector(fractionCompleted))];
 }
 
 #pragma mark - NSProgress Tracking
-
+// 当totalUnitCount或completedUnitCount属性的值小于零时
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSString *,id> *)change context:(void *)context {
    if ([object isEqual:self.downloadProgress]) {
         if (self.downloadProgressBlock) {

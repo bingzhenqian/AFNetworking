@@ -184,6 +184,7 @@ NS_ASSUME_NONNULL_BEGIN
 
  @see https://github.com/AFNetworking/AFNetworking/issues/1675
  */
+//初始调用返回“nil”时是否尝试重试创建后台会话的上传任务。 默认为“NO”。
 @property (nonatomic, assign) BOOL attemptsToRecreateUploadTasksForBackgroundSessions;
 
 ///---------------------
@@ -338,6 +339,7 @@ NS_ASSUME_NONNULL_BEGIN
 
  @param block A block object to be executed when the managed session becomes invalid. The block has no return value, and takes two arguments: the session, and the error related to the cause of invalidation.
  */
+//session无效后回调
 - (void)setSessionDidBecomeInvalidBlock:(nullable void (^)(NSURLSession *session, NSError *error))block;
 
 /**
@@ -455,7 +457,7 @@ NS_ASSUME_NONNULL_BEGIN
 ///--------------------
 /// @name Notifications
 ///--------------------
-
+//通知类型
 /**
  Posted when a task resumes.
  */
